@@ -8,13 +8,8 @@ const source = program.getSourceFile(sourcePath);
 
 type Maybe<T> = T | undefined
 type TypeName = string
-type NativeType = string
 type Registry = Record<TypeName, TypeDefinition>
-type TypeDefinition =  {
-  type: TypeName
-  nativeTypes?: NativeType[]
-  props?: Registry
-}
+type TypeDefinition = { types: TypeName[] } | { props: Registry }
 type Registerer = (type: TypeName, definition: TypeDefinition) => void;
 type RegistryManager = {
   getRegistry: () => Registry
@@ -46,23 +41,7 @@ const createTypeRegistryManager = (): RegistryManager => {
   };
 };
 
-const inspect = (node: ts.Node) => Object.entries({
-  isTypeLiteralNode: ts.isTypeLiteralNode(node),
-  isTypeNode: ts.isTypeNode(node),
-  isTypeElement: ts.isTypeElement(node),
-  isLiteralExpression: ts.isLiteralExpression(node),
-  isTypeAliasDeclaration: ts.isTypeAliasDeclaration(node),
-  isInterfaceDeclaration: ts.isInterfaceDeclaration(node),
-  isIntersectionTypeNode: ts.isIntersectionTypeNode(node),
-}).filter(([key, value]) => value)
-
 const getTypeStrings = (type: ts.Type, node?: ts.Node) => (type.isUnionOrIntersection() ? type.types : [type]).map(type => typeChecker.typeToString(type, node))
-const processTypes = (type: ts.Type, symbol?: ts.Symbol) => {
-  return Object.entries({
-    undefined: type.flags & ts.TypeFlags.Undefined || (symbol && symbol.flags & ts.SymbolFlags.Optional),
-    null: type.flags & ts.TypeFlags.Null,
-  }).filter(([, flag]) => flag).map(([key]) => key)
-}
 
 const getProps = (node: ts.InterfaceDeclaration | ts.TypeLiteralNode): Registry => 
   node.members
@@ -72,25 +51,31 @@ const getProps = (node: ts.InterfaceDeclaration | ts.TypeLiteralNode): Registry 
     if(!key || !prop.type) {
       return props
     }
+    const base = prop.questionToken ? ['undefined'] : []
     if (ts.isTypeLiteralNode(prop.type)) {
       return {
         ...props,
-        [key]: getProps(prop.type),
+        [key]: {
+          types: [getProps(prop.type), ...base]
+        },
       }
     }
     if (ts.isUnionTypeNode(prop.type) || ts.isIntersectionTypeNode(prop.type)) {
       const types = prop.type.types.map(typeNode => typeChecker.typeToString(typeChecker.getTypeFromTypeNode(typeNode)))
       return {
         ...props,
-        [key]: types,
+        [key]: {
+          types: [...types, ...base]
+        },
       }
-      console.log(key)
     }
 
     const types = getTypeStrings(typeChecker.getTypeAtLocation(prop), prop)
     return {
       ...props,
-      [key]: types,
+      [key]: {
+        types: [...types, ...base],
+      }
     }
   }, {})
 
@@ -103,15 +88,10 @@ const scan = (registryManager: RegistryManager, depth?: number) => {
     if (ts.isSourceFile(node)) {
       return ts.forEachChild(node, executor);
     }
-    /*
-    if (ts.isInterfaceDeclaration(node) || ts.isTypeLiteralNode(node)) {
-      return;
-    }
-    */
+
     if (ts.isInterfaceDeclaration(node)) {
       const id = ts.idText(node.name)
       return registryManager.register(id, {
-        type: id,
         props: getProps(node),
       })
     }
@@ -122,15 +102,13 @@ const scan = (registryManager: RegistryManager, depth?: number) => {
 
       if (ts.isTypeLiteralNode(type)) {
         return registryManager.register(id, {
-          type: id,
           props: getProps(type),
         })
       }
-      const nativeTypes = (ts.isUnionTypeNode(type) ? type.types : [type])
+      const types = (ts.isUnionTypeNode(type) ? type.types : [type])
           .map(t => typeChecker.typeToString(typeChecker.getTypeFromTypeNode(t)))
       registryManager.register(id, {
-        type: id,
-        nativeTypes,
+        types,
       })
     }
     ts.forEachChild(node, executor);

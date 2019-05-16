@@ -6,9 +6,9 @@ type Foo = {
 }
 type Fuga = {
   address: string;
-  foo?: Foo;
-  hoge: {
-    fuga: string
+  foo?: Foo | null;
+  hoge?: {
+    fuga?: string
   }
   ho: Hoge
 }
