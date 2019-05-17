@@ -1,8 +1,10 @@
 import ts, { isTypeAliasDeclaration } from "typescript";
 import { decorator } from "@babel/types";
 
-const sourcePath = "./src/hoge.d.ts";
-const program = ts.createProgram([sourcePath], {});
+// const sourcePath = "./src/example.d.ts";
+const sourcePath = "./src/query.d.ts";
+// const program = ts.createProgram([sourcePath], {});
+const program = ts.createProgram(["./src/test.d.ts", sourcePath], {});
 const typeChecker = program.getTypeChecker();
 const source = program.getSourceFile(sourcePath);
 
@@ -52,6 +54,15 @@ const getProps = (node: ts.InterfaceDeclaration | ts.TypeLiteralNode): Registry 
       return props
     }
     const base = prop.questionToken ? ['undefined'] : []
+
+    if(ts.isTypeReferenceNode(prop.type)) {
+      // const resolve = (symbol: ts.Symbol)
+      // const symbol = typeChecker.getSymbolAtLocation(prop.type.typeName)
+      // const type = symbol && symbol.declarations.map(d => )
+      // const tt = ts.isUnionTypeNode(prop.type) || ts.isIntersectionTypeNode(prop.type)
+      // console.log(key, type, tt)
+    }
+
     if (ts.isTypeLiteralNode(prop.type)) {
       return {
         ...props,

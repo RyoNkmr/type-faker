@@ -1,4 +1,6 @@
 type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>
+type Maybe<T> = T | undefined
+type Nullable<T> = T | null
 type ID = number;
 type Name = string;
 type URLString = string;
@@ -18,5 +20,5 @@ type User = {
   name: Name;
   address: Address
   friends: Friend[]
-  userIcon: URLString;
+  userIcon: Nullable<Maybe<URLString>>;
 };
