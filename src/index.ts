@@ -1,39 +1,31 @@
 import ts, { isTypeAliasDeclaration } from "typescript";
 import { decorator } from "@babel/types";
 
-// const sourcePath = "./src/example.d.ts";
-const sourcePath = "./src/query.d.ts";
-// const program = ts.createProgram([sourcePath], {});
-const program = ts.createProgram(["./src/test.d.ts", sourcePath], {});
-const typeChecker = program.getTypeChecker();
-const source = program.getSourceFile(sourcePath);
-
-type Maybe<T> = T | undefined
-type TypeName = string
-type Registry = Record<TypeName, TypeDefinition>
-type TypeDefinition = { types: TypeName[] } | { props: Registry }
+type Maybe<T> = T | undefined;
+type TypeName = string;
+type Registry = Record<TypeName, TypeDefinition>;
+type TypeDefinition = { types: TypeName[] } | { props: Registry };
 type Registerer = (type: TypeName, definition: TypeDefinition) => void;
 type RegistryManager = {
-  getRegistry: () => Registry
-  register: Registerer
-  isUnregisteredTypeName: (type: TypeName) => boolean
-  isUnregisteredNode: (type: ts.Node) => boolean
-}
-const getType = (node: ts.Node) => {
-  const type = typeChecker.getTypeAtLocation(node)
-  return {
-    type,
-    typeName: typeChecker.typeToString(type)
-  }
-}
+  getRegistry: () => Registry;
+  register: Registerer;
+  isUnregisteredTypeName: (type: TypeName) => boolean;
+  isUnregisteredNode: (type: ts.Node) => boolean;
+};
 
-const createTypeRegistryManager = (): RegistryManager => {
+const createTypeRegistryManager = (
+  typeChecker: ts.TypeChecker
+): RegistryManager => {
   let registry: Registry = {};
   const register: Registerer = (type: TypeName, definition: TypeDefinition) => {
     registry = { ...registry, [type]: definition };
   };
-  const isUnregisteredTypeName = (type: TypeName) => !registry.hasOwnProperty(type);
-  const isUnregisteredNode = (node: ts.Node) => isUnregisteredTypeName(getType(node).typeName)
+  const isUnregisteredTypeName = (type: TypeName) =>
+    !registry.hasOwnProperty(type);
+  const isUnregisteredNode = (node: ts.Node) =>
+    isUnregisteredTypeName(
+      typeChecker.typeToString(typeChecker.getTypeAtLocation(node))
+    );
 
   return {
     getRegistry: () => registry,
@@ -43,55 +35,96 @@ const createTypeRegistryManager = (): RegistryManager => {
   };
 };
 
-const getTypeStrings = (type: ts.Type, node?: ts.Node) => (type.isUnionOrIntersection() ? type.types : [type]).map(type => typeChecker.typeToString(type, node))
+const initializeEnvironment = (
+  sourcePath: string,
+  otherSources: string[] = [],
+  compilerOptions = {}
+) => {
+  const program = ts.createProgram(
+    [sourcePath, ...otherSources],
+    compilerOptions
+  );
+  const typeChecker = program.getTypeChecker();
+  const source = program.getSourceFile(sourcePath);
+  const manager = createTypeRegistryManager(typeChecker);
+  return {
+    program,
+    typeChecker,
+    source,
+    manager
+  };
+};
 
-const getProps = (node: ts.InterfaceDeclaration | ts.TypeLiteralNode): Registry => 
-  node.members
-  .filter((prop): prop is ts.PropertySignature => ts.isPropertySignature(prop))
-  .reduce((props, prop) => {
-    const key = ts.isIdentifier(prop.name) && ts.idText(prop.name)
-    if(!key || !prop.type) {
-      return props
-    }
-    const base = prop.questionToken ? ['undefined'] : []
+const createTypeStringsParser = (typeChecker: ts.TypeChecker) => (
+  type: ts.Type,
+  node?: ts.Node
+) =>
+  (type.isUnionOrIntersection() ? type.types : [type]).map(type =>
+    typeChecker.typeToString(type, node)
+  );
 
-    if(ts.isTypeReferenceNode(prop.type)) {
-      // const resolve = (symbol: ts.Symbol)
-      // const symbol = typeChecker.getSymbolAtLocation(prop.type.typeName)
-      // const type = symbol && symbol.declarations.map(d => )
-      // const tt = ts.isUnionTypeNode(prop.type) || ts.isIntersectionTypeNode(prop.type)
-      // console.log(key, type, tt)
-    }
-
-    if (ts.isTypeLiteralNode(prop.type)) {
-      return {
-        ...props,
-        [key]: {
-          types: [getProps(prop.type), ...base]
-        },
+const createPropsParser = (typeChecker: ts.TypeChecker) => (
+  node: ts.InterfaceDeclaration | ts.TypeLiteralNode
+): Registry => {
+  const getProps = createPropsParser(typeChecker);
+  const getTypeStrings = createTypeStringsParser(typeChecker);
+  return node.members
+    .filter(
+      (prop): prop is ts.PropertySignature => ts.isPropertySignature(prop)
+    )
+    .reduce((props, prop) => {
+      const key = ts.isIdentifier(prop.name) && ts.idText(prop.name);
+      if (!key || !prop.type) {
+        return props;
       }
-    }
-    if (ts.isUnionTypeNode(prop.type) || ts.isIntersectionTypeNode(prop.type)) {
-      const types = prop.type.types.map(typeNode => typeChecker.typeToString(typeChecker.getTypeFromTypeNode(typeNode)))
+      const base = prop.questionToken ? ["undefined"] : [];
+
+      if (ts.isTypeReferenceNode(prop.type)) {
+        // const resolve = (symbol: ts.Symbol)
+        // const symbol = typeChecker.getSymbolAtLocation(prop.type.typeName)
+        // const type = symbol && symbol.declarations.map(d => )
+        // const tt = ts.isUnionTypeNode(prop.type) || ts.isIntersectionTypeNode(prop.type)
+        // console.log(key, type, tt)
+      }
+
+      if (ts.isTypeLiteralNode(prop.type)) {
+        return {
+          ...props,
+          [key]: {
+            types: [getProps(prop.type), ...base]
+          }
+        };
+      }
+      if (
+        ts.isUnionTypeNode(prop.type) ||
+        ts.isIntersectionTypeNode(prop.type)
+      ) {
+        const types = prop.type.types.map(typeNode =>
+          typeChecker.typeToString(typeChecker.getTypeFromTypeNode(typeNode))
+        );
+        return {
+          ...props,
+          [key]: {
+            types: [...types, ...base]
+          }
+        };
+      }
+
+      const types = getTypeStrings(typeChecker.getTypeAtLocation(prop), prop);
       return {
         ...props,
         [key]: {
           types: [...types, ...base]
-        },
-      }
-    }
+        }
+      };
+    }, {});
+};
 
-    const types = getTypeStrings(typeChecker.getTypeAtLocation(prop), prop)
-    return {
-      ...props,
-      [key]: {
-        types: [...types, ...base],
-      }
-    }
-  }, {})
-
-
-const scan = (registryManager: RegistryManager, depth?: number) => {
+const scan = (
+  typeChecker: ts.TypeChecker,
+  registryManager: RegistryManager
+) => {
+  const getProps = createPropsParser(typeChecker);
   const executor = (node?: ts.Node): void => {
     if (node === undefined) {
       return;
@@ -101,10 +134,10 @@ const scan = (registryManager: RegistryManager, depth?: number) => {
     }
 
     if (ts.isInterfaceDeclaration(node)) {
-      const id = ts.idText(node.name)
+      const id = ts.idText(node.name);
       return registryManager.register(id, {
-        props: getProps(node),
-      })
+        props: getProps(node)
+      });
     }
 
     if (ts.isTypeAliasDeclaration(node)) {
@@ -113,21 +146,26 @@ const scan = (registryManager: RegistryManager, depth?: number) => {
 
       if (ts.isTypeLiteralNode(type)) {
         return registryManager.register(id, {
-          props: getProps(type),
-        })
+          props: getProps(type)
+        });
       }
-      const types = (ts.isUnionTypeNode(type) ? type.types : [type])
-          .map(t => typeChecker.typeToString(typeChecker.getTypeFromTypeNode(t)))
+      const types = (ts.isUnionTypeNode(type) ? type.types : [type]).map(t =>
+        typeChecker.typeToString(typeChecker.getTypeFromTypeNode(t))
+      );
       registryManager.register(id, {
-        types,
-      })
+        types
+      });
     }
     ts.forEachChild(node, executor);
   };
   return executor;
 };
 
-const manager = createTypeRegistryManager();
-scan(manager)(source);
+const { source, typeChecker, manager } = initializeEnvironment(
+  "./src/query.d.ts",
+  ["./src/schema.d.ts"]
+);
+
+scan(typeChecker, manager)(source);
 
 console.dir(manager.getRegistry(), { depth: 5 });
