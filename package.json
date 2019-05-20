@@ -24,6 +24,9 @@
     "typescript": "^3.4.5"
   },
   "dependencies": {
-    "faker": "^4.1.0"
+    "@types/faker": "^4.1.5",
+    "@types/inflected": "^1.1.29",
+    "faker": "^4.1.0",
+    "inflected": "^2.0.4"
   }
 }
