@@ -4,7 +4,8 @@ import { decorator } from "@babel/types";
 type Maybe<T> = T | undefined;
 type TypeName = string;
 type Registry = Record<TypeName, TypeDefinition>;
-type TypeDefinition = { types: TypeName[] } | { props: Registry };
+export type TypeRoot = Registry
+export type TypeDefinition = { types: Array<TypeName | TypeRoot> } | { props: Registry };
 type Registerer = (type: TypeName, definition: TypeDefinition) => void;
 type RegistryManager = {
   getRegistry: () => Registry;

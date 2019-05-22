@@ -1,4 +1,4 @@
-import { initializeEnvironment, scan } from "../src/typeParser"
+import { initializeEnvironment, scan, TypeRoot } from "../src/typeParser"
 
 describe("simpleCase", () => {
   test("Answer to the Ultimate Question of Life, the Universe, and Everything", () => {
@@ -7,7 +7,7 @@ describe("simpleCase", () => {
     )
     scan(typeChecker, manager)(source)
 
-    const expected = {
+    const expected: TypeRoot = {
       TypeAlias: {
         types: ["number"],
       },
