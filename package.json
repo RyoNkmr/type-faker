@@ -18,13 +18,13 @@
   },
   "homepage": "https://github.com/RyoNkmr/type-faker#readme",
   "devDependencies": {
-    "@types/jest": "^24.0.13",
-    "jest": "^24.8.0",
-    "ts-jest": "^24.0.2",
-    "typescript": "^3.4.5"
+    "@types/jest": "^25.2.3",
+    "jest": "^26.0.1",
+    "ts-jest": "^26.0.0",
+    "typescript": "^3.9.3"
   },
   "dependencies": {
-    "@types/faker": "^4.1.5",
+    "@types/faker": "^4.1.12",
     "@types/inflected": "^1.1.29",
     "faker": "^4.1.0",
     "inflected": "^2.0.4"
