@@ -1,13 +1,14 @@
 import ts, { isTypeAliasDeclaration, TypeFlags } from "typescript"
 import { decorator } from "@babel/types"
 
-type Maybe<T> = T | undefined
 type TypeName = string
 type Registry = Record<TypeName, TypeTreeNode>
-export type TypeTree = Registry
+
+export type TypeTree = Record<TypeName, TypeTreeNode>
 export type TypeTreeNode =
   | { types: Array<TypeName | TypeTree> }
-  | { props: Registry }
+  | { props: TypeTree }
+
 type Registerer = (type: TypeName, definition: TypeTreeNode) => void
 type RegistryManager = {
   getRegistry: () => Registry
