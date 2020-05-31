@@ -1,4 +1,4 @@
-import { singularize } from 'inflected'
+import { singularize } from "inflected"
 
 export interface FakeDataGenerator {
   string(): string
@@ -10,7 +10,9 @@ export interface FakeDataGenerator {
   future(): string
 }
 
-type GenerateFunction = (generator: FakeDataGenerator) => string | number | null | undefined
+type GenerateFunction = (
+  generator: FakeDataGenerator
+) => string | number | null | undefined
 type CustomAdapterDefinitions = {
   [key: string]: GenerateFunction
 }
@@ -22,25 +24,20 @@ const emptyAdapterDefinitions: CustomAdapterDefinitions = {
 
 type AdapterOptions = {
   isExtendingDefault?: boolean
-  arrayLength?: number,
+  arrayLength?: number
 }
 const defaultAdapterOptions: Required<AdapterOptions> = {
   isExtendingDefault: true,
   arrayLength: 3,
 }
 
-type SupportedJSPrimitiveTypes =
-  | 'string'
-  | 'number'
-  | 'null'
-  | 'undefined'
+type SupportedJSPrimitiveTypes = "string" | "number" | "null" | "undefined"
+type SupportedJSTypes = SupportedJSPrimitiveTypes | "string[]" | "number[]"
 
-type SupportedJSTypes =
-  | SupportedJSPrimitiveTypes
-  | 'string[]'
-  | 'number[]'
-
-export type FakeDataGeneratorAdapter = (key: string, type: SupportedJSTypes) => ReturnType<GenerateFunction> | ReturnType<GenerateFunction>[]
+export type FakeDataGeneratorAdapter = (
+  key: string,
+  type: SupportedJSTypes
+) => ReturnType<GenerateFunction> | ReturnType<GenerateFunction>[]
 
 const parseTypeString = (typeString: SupportedJSTypes) => {
   const result = /(\w+)(\[\])?/.exec(typeString)
@@ -50,22 +47,30 @@ const parseTypeString = (typeString: SupportedJSTypes) => {
   return { type: result[1] as SupportedJSPrimitiveTypes, isArray: !!result[2] }
 }
 
-const parseRegExpPattern = (key: string): string => {
-  const [, pattern] = /^\/(.+)\/$/.exec(key) || [, key]
-  return pattern
-}
+const parseRegExpPattern = (key: string): string =>
+  /^\/(.+)\/$/.exec(key)?.[1] ?? key
 
-export const createAdapter = (fakeDataGenerator: FakeDataGenerator) => (definitions: CustomAdapterDefinitions = {}, options: AdapterOptions = {}): FakeDataGeneratorAdapter => {
-  const { arrayLength, isExtendingDefault } = { ...defaultAdapterOptions, ...options }
+export const createAdapter = (fakeDataGenerator: FakeDataGenerator) => (
+  definitions: CustomAdapterDefinitions = {},
+  options: AdapterOptions = {}
+): FakeDataGeneratorAdapter => {
+  const { arrayLength, isExtendingDefault } = {
+    ...defaultAdapterOptions,
+    ...options,
+  }
   const adapterDefinitions = isExtendingDefault
     ? { ...emptyAdapterDefinitions, ...fakeDataGenerator, ...definitions }
     : { ...emptyAdapterDefinitions, ...definitions }
-  const adapters = Object.entries(adapterDefinitions).map(([key, fn]) => [new RegExp(parseRegExpPattern(key)), fn] as [RegExp, GenerateFunction])
-  const findAdapter = (keys: string[]) => adapters.find(([regexp]) => keys.some((key) => regexp.test(key)))
+  const adapters = Object.entries(adapterDefinitions).map(
+    ([key, fn]) =>
+      [new RegExp(parseRegExpPattern(key)), fn] as [RegExp, GenerateFunction]
+  )
+  const findAdapter = (keys: string[]) =>
+    adapters.find(([regexp]) => keys.some((key) => regexp.test(key)))
 
   return (key: string, typeString: SupportedJSTypes) => {
     const { type, isArray } = parseTypeString(typeString)
-    const singularKey = singularize(key);
+    const singularKey = singularize(key)
     const keys = singularKey === key ? [singularKey, key] : [key]
     const resultWithKey = findAdapter(keys)
 
@@ -81,5 +86,3 @@ export const createAdapter = (fakeDataGenerator: FakeDataGenerator) => (definiti
     return isArray ? Array(arrayLength).fill(value) : value
   }
 }
-
-export default createAdapter
